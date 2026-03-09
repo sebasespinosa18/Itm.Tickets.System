@@ -1,4 +1,3 @@
-// Itm.Booking.Api/Program.cs
 using Itm.Booking.Api.Dtos;
 using System.Net;
 
@@ -7,14 +6,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Configuración de HttpClientFactory con Resiliencia
 builder.Services.AddHttpClient("EventClient", client =>
 {
-    // Reemplaza el puerto con el que asigne Visual Studio a Event.Api
+    // Puerto EventClient
     client.BaseAddress = new Uri("http://localhost:5082");
 })
 .AddStandardResilienceHandler();
 
 builder.Services.AddHttpClient("DiscountClient", client =>
 {
-    // Reemplaza el puerto con el que asigne Visual Studio a Discount.Api
+    // Puerto DiscountClient
     client.BaseAddress = new Uri("http://localhost:5150");
 })
 .AddStandardResilienceHandler();
@@ -35,7 +34,7 @@ app.MapPost("/api/bookings", async (BookingRequest request, IHttpClientFactory f
     var eventClient = factory.CreateClient("EventClient");
     var discountClient = factory.CreateClient("DiscountClient");
 
-    // 1. LECTURA EN PARALELO
+    // 1.
     var eventTask = eventClient.GetAsync($"/api/events/{request.EventId}");
     var discountTask = string.IsNullOrWhiteSpace(request.DiscountCode)
         ? Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound))
@@ -49,7 +48,7 @@ app.MapPost("/api/bookings", async (BookingRequest request, IHttpClientFactory f
 
     var eventInfo = await eventResponse.Content.ReadFromJsonAsync<EventDto>();
 
-    // Manejo del descuento (puede ser 404 si no existe)
+    // Manejo del descuento (404 si no existe)
     decimal porcentajeDescuento = 0m;
     var discountResponse = await discountTask;
     if (discountResponse.IsSuccessStatusCode)
@@ -58,12 +57,12 @@ app.MapPost("/api/bookings", async (BookingRequest request, IHttpClientFactory f
         if (discountInfo != null) porcentajeDescuento = discountInfo.Porcentaje;
     }
 
-    // MATEMÁTICAS: Calcular el total
+    // Calcular el total
     decimal subtotal = (eventInfo?.PrecioBase ?? 0) * request.Tickets;
     decimal descuentoAplicado = subtotal * porcentajeDescuento;
     decimal totalAPagar = subtotal - descuentoAplicado;
 
-    // 2. ACCIÓN: RESERVAR SILLAS (Inicio de SAGA)
+    // 2. RESERVAR SILLAS
     var reserveResponse = await eventClient.PostAsJsonAsync("/api/events/reserve",
         new { EventId = request.EventId, Quantity = request.Tickets });
 
@@ -72,7 +71,7 @@ app.MapPost("/api/bookings", async (BookingRequest request, IHttpClientFactory f
 
     try
     {
-        // 3. SIMULACIÓN DE PAGO (Punto Crítico)
+        // 3. SIMULACIÓN DE PAGO
         bool paymentSuccess = new Random().Next(1, 10) > 5;
         if (!paymentSuccess) throw new Exception("Fondos insuficientes en la pasarela de pago.");
 
